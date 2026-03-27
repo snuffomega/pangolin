@@ -1,0 +1,40 @@
+http:
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+
+  routers:
+    main-app-router-redirect:
+      rule: "Host(`pangolin.manchild.place`)"
+      service: next-service
+      entryPoints: [web]
+      middlewares: [redirect-to-https]
+
+    next-router:
+      rule: "Host(`pangolin.manchild.place`) && !PathPrefix(`/api/v1`)"
+      service: next-service
+      entryPoints: [websecure]
+      tls: {}
+
+    api-router:
+      rule: "Host(`pangolin.manchild.place`) && PathPrefix(`/api/v1`)"
+      service: api-service
+      entryPoints: [websecure]
+      tls: {}
+
+    ws-router:
+      rule: "Host(`pangolin.manchild.place`)"
+      service: api-service
+      entryPoints: [websecure]
+      tls: {}
+
+  services:
+    next-service:
+      loadBalancer:
+        servers:
+          - url: "http://pangolin:3002"
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://pangolin:3000"

@@ -1,0 +1,20 @@
+gerbil:
+  start_port: 51820
+  base_endpoint: "pangolin.yourdomain.com"   # PANGOLIN_DOMAIN
+
+app:
+  dashboard_url: "https://pangolin.yourdomain.com"   # PUBLIC_URL
+
+domains:
+  main:
+    base_domain: "yourdomain.com"   # BASE_DOMAIN
+    cert_resolver: "letsencrypt"
+
+server:
+  # Generate a random secret: openssl rand -hex 32
+  secret: "your-64-char-random-secret-here"
+
+flags:
+  require_email_verification: false
+  disable_signup_without_invite: true
+  disable_user_create_org: true

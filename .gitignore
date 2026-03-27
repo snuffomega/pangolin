@@ -1,0 +1,5 @@
+.env
+config/config.yml
+config/db/
+config/letsencrypt/
+config/logs/

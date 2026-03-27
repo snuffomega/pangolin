@@ -1,0 +1,87 @@
+services:
+  pangolin:
+    image: fosrl/pangolin:1.16.2
+    container_name: pangolin
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config
+    ports:
+      # Local bootstrap access to the dashboard UI
+      - "3002:3002"   # UI
+      - "3000:3000"   # API (needed for initial setup)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
+      interval: "3s"
+      timeout: "3s"
+      retries: 15
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL}
+      DASHBOARD_URL: ${PUBLIC_URL}
+      API_PUBLIC_URL: ${PUBLIC_URL}/api/v1
+    networks:
+      - pangolin
+
+  traefik:
+    image: traefik:v3.6.10
+    container_name: pangolin-traefik
+    restart: unless-stopped
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    command:
+      - "--configFile=/etc/traefik/traefik_config.yml"
+      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
+    volumes:
+      - ./config/traefik:/etc/traefik:ro
+      - ./config/letsencrypt:/letsencrypt
+      - ./config/logs:/var/log/traefik
+    environment:
+      - CF_DNS_API_TOKEN=${CF_API_TOKEN}
+      - PANGOLIN_DOMAIN=${PANGOLIN_DOMAIN}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    # Traefik dashboard (uncomment for debugging — internal access only)
+    #ports:
+    #  - "8081:8080"
+    networks:
+      pangolin: {}
+      lan:
+        ipv4_address: 192.168.0.1  # Update with a free IP in your LAN subnet
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.3.0
+    container_name: pangolin-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    networks:
+      - pangolin
+
+  pangolin-cf-bridge:
+    image: hhftechnology/pangolin-cloudflare-tunnel:2.0.0
+    container_name: pangolin-cf-bridge
+    restart: unless-stopped
+    environment:
+      - TRAEFIK_API_ENDPOINT=http://pangolin-traefik:8080
+      - TRAEFIK_ENTRYPOINTS=web,websecure
+      - TRAEFIK_SERVICE_ENDPOINT=https://pangolin-traefik:443
+      - CLOUDFLARE_API_TOKEN=${CF_API_TOKEN}
+      - CLOUDFLARE_ACCOUNT_ID=${CF_ACCOUNT_ID}
+      - CLOUDFLARE_TUNNEL_ID=${CF_TUNNEL_ID}
+      - CLOUDFLARE_ZONE_IDS=${CF_ZONE_ID}
+      - DOMAIN_NAMES=${BASE_DOMAIN}
+      - CLOUDFLARE_TARGET_NO_TLS_VERIFY=true
+      - SKIP_TLS_ROUTES=false
+    depends_on:
+      - traefik
+      - cloudflared
+    networks:
+      - pangolin
+
+
+networks:
+  pangolin:
+    name: pangolin
+    driver: bridge
+
+  lan:
+    external: true
+    name: br0
